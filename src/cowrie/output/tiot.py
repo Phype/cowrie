@@ -7,8 +7,6 @@ from __future__ import absolute_import, division
 import json
 import logging
 
-from hpfeeds.twisted import ClientSessionService
-
 from twisted.internet import endpoints, reactor, ssl
 from twisted.python import log
 
@@ -23,6 +21,7 @@ import json
 import time
 
 import traceback
+import os.path
 
 class Client:
 
@@ -126,10 +125,26 @@ class Output(cowrie.core.output.Output):
             pass
 
         elif entry["eventid"] == 'cowrie.command.input':
+            ts = round((time.time() - self.meta[session]['date']) * 1000) / 1000
+            
+            # Add dummy prompt for readability
+            self.meta[session]['stream'].append({
+                "in":   False,
+                "ts":   ts,
+                "data": " > "
+            })
+            
             self.meta[session]['stream'].append({
                 "in":   True,
-                "ts":   round((time.time() - self.meta[session]['date']) * 1000) / 1000,
-                "data": entry['input'].decode('ascii', 'ignore')
+                "ts":   ts,
+                "data": entry['input']
+            })
+            
+            # Add newline for readability
+            self.meta[session]['stream'].append({
+                "in":   True,
+                "ts":   ts,
+                "data": "\n"
             })
 
         elif entry["eventid"] == 'cowrie.command.failed':
@@ -137,16 +152,20 @@ class Output(cowrie.core.output.Output):
 
         elif entry["eventid"] == 'cowrie.session.file_download':
             
-            log.msg(repr(entry))
+            filepath = None
+            filesize = 0
+            if entry['outfile'] and os.path.isfile(entry['outfile']):
+                filepath = entry['outfile']
+                filesize = os.path.getsize(filepath)
             
             self.meta[session]['samples'].append({
                 "type":   "sample",
                 "url":    entry['url'],
-                "name":   None,
+                "name":   entry['destfile'],
                 "date":   time.time(),
                 "sha256": entry['shasum'],
                 "info":   "",
-                "length": 0
+                "length": filesize
             })
 
         elif entry["eventid"] == 'cowrie.session.file_upload':
@@ -162,5 +181,6 @@ class Output(cowrie.core.output.Output):
             meta = self.meta.pop(session, None)
             if meta:
                 log.msg('publishing metadata to tiot', logLevel=logging.DEBUG)
+                log.msg("\n" + json.dumps(meta))
                 
                 self.client.put_session(meta)
