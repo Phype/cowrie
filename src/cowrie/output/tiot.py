@@ -1,5 +1,6 @@
 """
-Output plugin for HPFeeds
+Output plugin for tiot
+See: https://github.com/Phype/telnet-iot-honeypot
 """
 
 from __future__ import absolute_import, division
@@ -181,6 +182,4 @@ class Output(cowrie.core.output.Output):
             meta = self.meta.pop(session, None)
             if meta:
                 log.msg('publishing metadata to tiot', logLevel=logging.DEBUG)
-                log.msg("\n" + json.dumps(meta))
-                
                 self.client.put_session(meta)
