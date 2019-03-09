@@ -20,9 +20,70 @@ import requests.auth
 
 import json
 import time
+import struct
 
 import traceback
 import os.path
+
+
+OP_OPEN, OP_CLOSE, OP_WRITE, OP_EXEC = 1, 2, 3, 4
+TYPE_INPUT, TYPE_OUTPUT, TYPE_INTERACT = 1, 2, 3
+
+def readttylog(filename):
+    
+    fd = open(filename, "rb")
+    
+    ssize = struct.calcsize('<iLiiLL')
+        
+    lastin = ""
+    firstts = None
+    stream = []
+
+    while 1:
+        try:
+            (op, tty, length, dir, sec, usec) = \
+                struct.unpack('<iLiiLL', fd.read(ssize))
+            data = fd.read(length)
+        except struct.error:
+            break
+
+        if op == OP_WRITE:
+            
+            data = data.decode("ascii", "ignore")
+            
+            ts = float(sec) + float(usec) / 1000000
+            
+            if firstts == None:
+                firstts = ts
+                ts = 0.0
+            else:
+                ts = ts - firstts
+                ts = round((ts) * 1000) / 1000
+            
+            if dir == TYPE_OUTPUT:
+                if lastin.startswith(data):
+                    lastin = lastin[len(data):]
+                else:
+                    # print [1, dir, data]
+                    stream.append({
+                        "in":False,
+                        "ts":ts,
+                        "data":data
+                    })
+            elif dir == TYPE_INPUT:
+                lastin = data
+                #print [2, dir, data]
+                #sys.stdout.write(data)
+                stream.append({
+                    "in":True,
+                    "ts":ts,
+                    "data":data
+                })
+                
+        if op == OP_CLOSE:
+            break
+        
+    return stream
 
 class Client:
 
@@ -176,7 +237,7 @@ class Output(cowrie.core.output.Output):
             pass
 
         elif entry["eventid"] == 'cowrie.log.closed':
-            pass
+            self.meta[session]["stream"] = readttylog(entry["ttylog"])
 
         elif entry["eventid"] == 'cowrie.session.closed':
             meta = self.meta.pop(session, None)
