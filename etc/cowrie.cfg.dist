@@ -745,3 +745,11 @@ topic = cowrie
 # Method to use when sending data to redis.
 # Can be one of [lpush, rpush, publish]. Defaults to lpush
 #send_method = lpush
+
+# Output plugin for https://github.com/Phype/telnet-iot-honeypot
+[output_tiot]
+enabled = true
+backend_url = http://localhost:5000
+username = username_from_config_yaml
+password = password_from_config_yaml
+
