@@ -389,7 +389,7 @@ ciphers = aes128-ctr,aes192-ctr,aes256-ctr,aes256-cbc,aes192-cbc,aes128-cbc,3des
 # hmac-sha1 and hmac-md5 are considered insecure now, and
 # instead MACs with higher number of bits should be used.
 #
-# Supported HMACs: 
+# Supported HMACs:
 # hmac-sha2-512
 # hmac-sha2-384
 # hmac-sha2-256
@@ -403,7 +403,7 @@ macs = hmac-sha2-512,hmac-sha2-384,hmac-sha2-56,hmac-sha1,hmac-md5
 # MUST be supplied as a comma-separated string without
 # any spaces or newlines.
 #
-# Supported Compression Methods: 
+# Supported Compression Methods:
 # zlib@openssh.com
 # zlib
 # none
@@ -805,3 +805,18 @@ backend_url = http://localhost:5000
 username = username_from_config_yaml
 password = password_from_config_yaml
 
+# Perform Reverse DNS lookup
+#[output_reversedns]
+#enabled = true
+# Timeout in seconds
+#timeout = 3
+
+#[output_greynoise]
+#enabled = true
+# Name of the tags separated by comma, for which the IP has to be scanned for.
+# Example "SHODAN,JBOSS_WORM,CPANEL_SCANNER_LOW"
+# If there isn't any specific tag then just leave it "all"
+#tags = all
+# It's optional to have API key, so if you don't want to but
+# API key then leave this option commented
+#api_key = 1234567890
