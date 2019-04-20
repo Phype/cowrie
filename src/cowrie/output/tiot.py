@@ -155,13 +155,20 @@ class Output(cowrie.core.output.Output):
     def start(self):
         log.msg("WARNING: Beta version of new hpfeeds enabled. This will become hpfeeds in a future release.")
 
-        self.backend_url = CONFIG.get('output_tiot', 'backend_url')
-        self.username    = CONFIG.get('output_tiot', 'username')
-        self.password    = CONFIG.get('output_tiot', 'password')
+        self.backend_url  = CONFIG.get('output_tiot', 'backend_url')
+        self.username     = CONFIG.get('output_tiot', 'username')
+        self.password     = CONFIG.get('output_tiot', 'password')
+        self.log_raw_file = CONFIG.get('output_tiot', 'log_raw', fallback=None)
 
         self.meta = {}
 
         self.client = Client(self.backend_url, self.username, self.password)
+
+    def log_raw(self, obj):
+        if self.log_raw_file:
+            fp = open(self.log_raw_file, "ab")
+            fp.write(json.dumps(obj).replace("\n", "") + "\n")
+            fp.close()
 
     def stop(self):
         pass
@@ -243,4 +250,5 @@ class Output(cowrie.core.output.Output):
             meta = self.meta.pop(session, None)
             if meta:
                 log.msg('publishing metadata to tiot', logLevel=logging.DEBUG)
+                self.log_raw(meta)
                 self.client.put_session(meta)
