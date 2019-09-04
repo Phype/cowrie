@@ -22,13 +22,15 @@ from twisted.protocols.policies import TimeoutMixin
 from twisted.python import log, randbytes
 from twisted.python.compat import _bytesChr as chr
 
-from cowrie.core.config import CONFIG
+from cowrie.core.config import CowrieConfig
 
 
 class HoneyPotSSHTransport(transport.SSHServerTransport, TimeoutMixin):
     startTime = None
     gotVersion = False
     ipv4rex = re.compile(r'^::ffff:(\d+\.\d+\.\d+\.\d+)$')
+    auth_timeout = CowrieConfig().getint('honeypot', 'authentication_timeout', fallback=120)
+    interactive_timeout = CowrieConfig().getint('honeypot', 'interactive_timeout', fallback=300)
 
     def __repr__(self):
         """
@@ -68,7 +70,7 @@ class HoneyPotSSHTransport(transport.SSHServerTransport, TimeoutMixin):
         self.currentEncryptions.setKeys(b'', b'', b'', b'', b'', b'')
 
         self.startTime = time.time()
-        self.setTimeout(CONFIG.getint('honeypot', 'authentication_timeout', fallback=120))
+        self.setTimeout(self.auth_timeout)
 
     def sendKexInit(self):
         """
@@ -100,7 +102,7 @@ class HoneyPotSSHTransport(transport.SSHServerTransport, TimeoutMixin):
             self.otherVersionString = self.buf.split(b'\n')[0].strip()
             log.msg(eventid='cowrie.client.version', version=repr(self.otherVersionString),
                     format="Remote SSH version: %(version)s")
-            m = re.match(br'SSH-(\d+).(\d+)-(.*)', self.otherVersionString)
+            m = re.match(br'SSH-(\d+.\d+)-(.*)', self.otherVersionString)
             if m is None:
                 log.msg("Bad protocol version identification: {}".format(repr(self.otherVersionString)))
                 self.transport.write(b'Protocol mismatch.\n')
@@ -108,9 +110,8 @@ class HoneyPotSSHTransport(transport.SSHServerTransport, TimeoutMixin):
                 return
             else:
                 self.gotVersion = True
-                remote_major = m.group(1)
-                remote_minor = m.group(2)
-                if remote_major != b'2' and not (remote_major == b'1' and remote_minor == b'99'):
+                remote_version = m.group(1)
+                if remote_version not in self.supportedVersions:
                     self._unsupportedVersionReceived(None)
                     return
                 i = self.buf.index(b'\n')
@@ -121,6 +122,9 @@ class HoneyPotSSHTransport(transport.SSHServerTransport, TimeoutMixin):
             messageNum = ord(packet[0:1])
             self.dispatchMessage(messageNum, packet[1:])
             packet = self.getPacket()
+
+    def dispatchMessage(self, message_num, payload):
+        transport.SSHServerTransport.dispatchMessage(self, message_num, payload)
 
     def sendPacket(self, messageType, payload):
         """
@@ -197,7 +201,7 @@ class HoneyPotSSHTransport(transport.SSHServerTransport, TimeoutMixin):
         """
         # Reset timeout. Not everyone opens shell so need timeout at transport level
         if service.name == b'ssh-connection':
-            self.setTimeout(CONFIG.getint('honeypot', 'interactive_timeout', fallback=300))
+            self.setTimeout(self.interactive_timeout)
 
         # when auth is successful we enable compression
         # this is called right after MSG_USERAUTH_SUCCESS
@@ -230,7 +234,7 @@ class HoneyPotSSHTransport(transport.SSHServerTransport, TimeoutMixin):
         @param reason: the reason for the disconnect.  Should be one of the
                        DISCONNECT_* values.
         @type reason: C{int}
-        @param desc: a descrption of the reason for the disconnection.
+        @param desc: a description of the reason for the disconnection.
         @type desc: C{str}
         """
         if b'bad packet length' not in desc:
@@ -242,8 +246,7 @@ class HoneyPotSSHTransport(transport.SSHServerTransport, TimeoutMixin):
 
     def receiveError(self, reasonCode, description):
         """
-        Called when we receive a disconnect error message from the other
-        side.
+        Called when we receive a disconnect error message from the other side.
 
         @param reasonCode: the reason for the disconnect, one of the
                            DISCONNECT_ values.

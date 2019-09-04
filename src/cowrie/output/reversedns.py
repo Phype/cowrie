@@ -8,7 +8,7 @@ from twisted.names import client, error
 from twisted.python import log
 
 import cowrie.core.output
-from cowrie.core.config import CONFIG
+from cowrie.core.config import CowrieConfig
 
 
 class Output(cowrie.core.output.Output):
@@ -16,16 +16,12 @@ class Output(cowrie.core.output.Output):
     Output plugin used for reverse DNS lookup
     """
 
-    def __init__(self):
-        self.timeout = [CONFIG.getint(
-            'output_reversedns', 'timeout', fallback=3)]
-        cowrie.core.output.Output.__init__(self)
-
     def start(self):
         """
         Start Output Plugin
         """
-        pass
+        self.timeout = [CowrieConfig().getint(
+            'output_reversedns', 'timeout', fallback=3)]
 
     def stop(self):
         """
